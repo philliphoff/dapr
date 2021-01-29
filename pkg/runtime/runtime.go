@@ -12,7 +12,7 @@ import (
 	"net"
 	"os"
 	"reflect"
-//	"strconv"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1041,21 +1041,23 @@ func (a *DaprRuntime) initNameResolution() error {
 	var err error
 	var resolverMetadata = nr.Metadata{}
 
-	switch a.runtimeConfig.Mode {
-	case modes.KubernetesMode:
-		resolver, err = a.nameResolutionRegistry.Create("kubernetes")
-	case modes.StandaloneMode:
-		// TODO: Provide a mechanism to choose an arbitrary resolver in standalone mode.
-		resolver, err = a.nameResolutionRegistry.Create("static")
-//		resolver, err = a.nameResolutionRegistry.Create("mdns")
-//		// properties to register mDNS instances.
-//		resolverMetadata.Properties = map[string]string{
-//			nr.MDNSInstanceName:    a.runtimeConfig.ID,
-//			nr.MDNSInstanceAddress: a.hostAddress,
-//			nr.MDNSInstancePort:    strconv.Itoa(a.runtimeConfig.InternalGRPCPort),
-//		}
-	default:
-		return errors.Errorf("remote calls not supported for %s mode", string(a.runtimeConfig.Mode))
+	if (a.runtimeConfig.NameResolver != "") {
+		resolver, err = a.nameResolutionRegistry.Create(a.runtimeConfig.NameResolver)
+	} else {
+		switch a.runtimeConfig.Mode {
+		case modes.KubernetesMode:
+			resolver, err = a.nameResolutionRegistry.Create("kubernetes")
+		case modes.StandaloneMode:
+			resolver, err = a.nameResolutionRegistry.Create("mdns")
+			// properties to register mDNS instances.
+			resolverMetadata.Properties = map[string]string{
+				nr.MDNSInstanceName:    a.runtimeConfig.ID,
+				nr.MDNSInstanceAddress: a.hostAddress,
+				nr.MDNSInstancePort:    strconv.Itoa(a.runtimeConfig.InternalGRPCPort),
+			}
+		default:
+			return errors.Errorf("remote calls not supported for %s mode", string(a.runtimeConfig.Mode))
+		}
 	}
 
 	if err != nil {

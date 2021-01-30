@@ -1041,30 +1041,33 @@ func (a *DaprRuntime) initNameResolution() error {
 	var err error
 	var resolverMetadata = nr.Metadata{}
 
-	if (a.runtimeConfig.NameResolver != "") {
-		resolver, err = a.nameResolutionRegistry.Create(a.runtimeConfig.NameResolver)
-	} else {
+	var nameResolver = a.runtimeConfig.NameResolver
+
+	if (nameResolver == "") {
 		switch a.runtimeConfig.Mode {
 		case modes.KubernetesMode:
-			resolver, err = a.nameResolutionRegistry.Create("kubernetes")
+			nameResolver = "kubernetes"
 		case modes.StandaloneMode:
-			resolver, err = a.nameResolutionRegistry.Create("mdns")
-			// properties to register mDNS instances.
-			resolverMetadata.Properties = map[string]string{
-				nr.MDNSInstanceName:    a.runtimeConfig.ID,
-				nr.MDNSInstanceAddress: a.hostAddress,
-				nr.MDNSInstancePort:    strconv.Itoa(a.runtimeConfig.InternalGRPCPort),
-			}
+			nameResolver = "mdns"
 		default:
 			return errors.Errorf("remote calls not supported for %s mode", string(a.runtimeConfig.Mode))
 		}
 	}
+
+	resolver, err = a.nameResolutionRegistry.Create(nameResolver)
 
 	if err != nil {
 		log.Warnf("error creating name resolution resolver %s: %s", a.runtimeConfig.Mode, err)
 		return err
 	}
 
+	// properties to register resolver instances.
+	resolverMetadata.Properties = map[string]string{
+		nr.MDNSInstanceName:    a.runtimeConfig.ID,
+		nr.MDNSInstanceAddress: a.hostAddress,
+		nr.MDNSInstancePort:    strconv.Itoa(a.runtimeConfig.InternalGRPCPort),
+	}
+	
 	if err = resolver.Init(resolverMetadata); err != nil {
 		log.Errorf("failed to initialize name resolution resolver %s: %s", a.runtimeConfig.Mode, err)
 		return err

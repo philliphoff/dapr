@@ -54,12 +54,13 @@ type Config struct {
 	AppSSL               bool
 	MaxRequestBodySize   int
 	NameResolver         string
+	NameResolverConfig   string
 }
 
 // NewRuntimeConfig returns a new runtime config
 func NewRuntimeConfig(
 	id string, placementAddresses []string,
-	controlPlaneAddress, allowedOrigins, globalConfig, componentsPath, appProtocol, mode string, nameResolver string,
+	controlPlaneAddress, allowedOrigins, globalConfig, componentsPath, appProtocol, mode string, nameResolver string, nameResolverConfig string,
 	httpPort, internalGRPCPort, apiGRPCPort, appPort, profilePort int,
 	enableProfiling bool, maxConcurrency int, mtlsEnabled bool, sentryAddress string, appSSL bool, maxRequestBodySize int) *Config {
 	return &Config{
@@ -87,5 +88,6 @@ func NewRuntimeConfig(
 		AppSSL:               appSSL,
 		MaxRequestBodySize:   maxRequestBodySize,
 		NameResolver:         nameResolver,
+		NameResolverConfig:   nameResolverConfig,
 	}
 }

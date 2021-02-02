@@ -1063,9 +1063,10 @@ func (a *DaprRuntime) initNameResolution() error {
 
 	// properties to register resolver instances.
 	resolverMetadata.Properties = map[string]string{
-		nr.MDNSInstanceName:    a.runtimeConfig.ID,
-		nr.MDNSInstanceAddress: a.hostAddress,
-		nr.MDNSInstancePort:    strconv.Itoa(a.runtimeConfig.InternalGRPCPort),
+		nr.MDNSInstanceName:          a.runtimeConfig.ID,
+		nr.MDNSInstanceAddress:       a.hostAddress,
+		nr.MDNSInstancePort:          strconv.Itoa(a.runtimeConfig.InternalGRPCPort),
+		nr.MDNSInstanceConfiguration: a.runtimeConfig.NameResolverConfig,		
 	}
 	
 	if err = resolver.Init(resolverMetadata); err != nil {

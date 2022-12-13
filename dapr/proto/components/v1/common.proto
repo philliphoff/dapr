@@ -25,6 +25,11 @@ message MetadataRequest {
   map<string, string> properties = 1;
 }
 
+// InitRequest is the request for initializing the component.
+message InitRequest {
+  MetadataRequest metadata = 1;
+}
+
 // reserved for future-proof extensibility
 message FeaturesRequest {}
 

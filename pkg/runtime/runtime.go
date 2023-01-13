@@ -1476,6 +1476,7 @@ func (a *DaprRuntime) getNewServerConfig(apiListenAddresses []string, port int) 
 		UnixDomainSocket:     a.runtimeConfig.UnixDomainSocket,
 		ReadBufferSizeKB:     a.runtimeConfig.ReadBufferSize,
 		EnableAPILogging:     a.runtimeConfig.EnableAPILogging,
+		EnableScaler:         a.runtimeConfig.EnableScaler,
 	}
 }
 

@@ -82,6 +82,7 @@ func FromFlags() (*DaprRuntime, error) {
 	appHealthProbeInterval := flag.Int("app-health-probe-interval", int(apphealth.DefaultProbeInterval/time.Second), "Interval to probe for the health of the app in seconds")
 	appHealthProbeTimeout := flag.Int("app-health-probe-timeout", int(apphealth.DefaultProbeTimeout/time.Millisecond), "Timeout for app health probes in milliseconds")
 	appHealthThreshold := flag.Int("app-health-threshold", int(apphealth.DefaultThreshold), "Number of consecutive failures for the app to be considered unhealthy")
+	enableScaler := flag.Bool("enable-scaler", true, "Enable gRPC endpoint for Dapr KEDA external scaler")
 
 	loggerOptions := logger.DefaultOptions()
 	loggerOptions.AttachCmdFlags(flag.StringVar, flag.BoolVar)
@@ -305,6 +306,7 @@ func FromFlags() (*DaprRuntime, error) {
 		AppHealthProbeInterval:       healthProbeInterval,
 		AppHealthProbeTimeout:        healthProbeTimeout,
 		AppHealthThreshold:           healthThreshold,
+		EnableScaler:                *enableScaler,
 	})
 
 	// set environment variables

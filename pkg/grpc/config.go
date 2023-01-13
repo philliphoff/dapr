@@ -25,4 +25,5 @@ type ServerConfig struct {
 	UnixDomainSocket     string
 	ReadBufferSizeKB     int
 	EnableAPILogging     bool
+	EnableScaler         bool
 }

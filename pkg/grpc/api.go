@@ -75,6 +75,9 @@ type API interface {
 	// Dapr Service methods
 	runtimev1pb.DaprServer
 
+	// Dapr KEDA external scaler methods
+	runtimev1pb.ExternalScalerServer
+
 	// Methods internal to the object
 	SetAppChannel(appChannel channel.AppChannel)
 	SetDirectMessaging(directMessaging messaging.DirectMessaging)
@@ -323,6 +326,22 @@ func (a *api) validateAndGetPubsubAndTopic(pubsubName, topic string, reqMeta map
 	}
 
 	return thepubsub, pubsubName, topic, rawPayload, nil
+}
+
+func (a *api) IsActive(context.Context, *runtimev1pb.ScaledObjectRef) (*runtimev1pb.IsActiveResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IsActive not implemented")
+}
+
+func (a *api) StreamIsActive(*runtimev1pb.ScaledObjectRef, runtimev1pb.ExternalScaler_StreamIsActiveServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamIsActive not implemented")
+}
+
+func (a *api) GetMetricSpec(context.Context, *runtimev1pb.ScaledObjectRef) (*runtimev1pb.GetMetricSpecResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMetricSpec not implemented")
+}
+
+func (a *api) GetMetrics(context.Context, *runtimev1pb.GetMetricsRequest) (*runtimev1pb.GetMetricsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMetrics not implemented")
 }
 
 func (a *api) PublishEvent(ctx context.Context, in *runtimev1pb.PublishEventRequest) (*emptypb.Empty, error) {

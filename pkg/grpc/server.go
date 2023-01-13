@@ -158,6 +158,7 @@ func (s *server) StartNonBlocking() error {
 			internalv1pb.RegisterServiceInvocationServer(server, s.api)
 		} else if s.kind == apiServer {
 			runtimev1pb.RegisterDaprServer(server, s.api)
+			runtimev1pb.RegisterExternalScalerServer(server, s.api)
 		}
 
 		go func(server *grpcGo.Server, l net.Listener) {

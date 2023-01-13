@@ -452,6 +452,8 @@ check-proto-diff:
 	git diff --exit-code ./pkg/proto/runtime/v1/appcallback_grpc.pb.go # check no changes
 	git diff --exit-code ./pkg/proto/runtime/v1/dapr.pb.go # check no changes
 	git diff --exit-code ./pkg/proto/runtime/v1/dapr_grpc.pb.go # check no changes
+	git diff --exit-code ./pkg/proto/runtime/v1/externalscaler.pb.go # check no changes
+	git diff --exit-code ./pkg/proto/runtime/v1/externalscaler_grpc.pb.go # check no changes
 	git diff --exit-code ./pkg/proto/sentry/v1/sentry.pb.go # check no changes
 
 

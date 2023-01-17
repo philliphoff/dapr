@@ -43,6 +43,21 @@ service PubSub {
   rpc Ping(PingRequest) returns (PingResponse) {}
 }
 
+service PubSubMetrics {
+  // Returns the metrics about the pubsub store.
+  rpc GetMetrics(GetMetricsRequest) returns (GetMetricsResponse) {}
+}
+
+message GetMetricsRequest {
+  // Message metadata.
+  map<string, string> metadata = 1;
+}
+
+message GetMetricsResponse {
+  // The (approximate) count of pending messages in the pubsub store.
+  uint64 PendingMessageCount = 1;
+}
+
 // Used for describing errors when ack'ing messages.
 message AckMessageError {
   string message = 1;

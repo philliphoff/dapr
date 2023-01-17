@@ -298,3 +298,89 @@ var PubSub_ServiceDesc = grpc.ServiceDesc{
 	},
 	Metadata: "dapr/proto/components/v1/pubsub.proto",
 }
+
+// PubSubMetricsClient is the client API for PubSubMetrics service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type PubSubMetricsClient interface {
+	// Returns the metrics about the pubsub store.
+	GetMetrics(ctx context.Context, in *GetMetricsRequest, opts ...grpc.CallOption) (*GetMetricsResponse, error)
+}
+
+type pubSubMetricsClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewPubSubMetricsClient(cc grpc.ClientConnInterface) PubSubMetricsClient {
+	return &pubSubMetricsClient{cc}
+}
+
+func (c *pubSubMetricsClient) GetMetrics(ctx context.Context, in *GetMetricsRequest, opts ...grpc.CallOption) (*GetMetricsResponse, error) {
+	out := new(GetMetricsResponse)
+	err := c.cc.Invoke(ctx, "/dapr.proto.components.v1.PubSubMetrics/GetMetrics", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PubSubMetricsServer is the server API for PubSubMetrics service.
+// All implementations should embed UnimplementedPubSubMetricsServer
+// for forward compatibility
+type PubSubMetricsServer interface {
+	// Returns the metrics about the pubsub store.
+	GetMetrics(context.Context, *GetMetricsRequest) (*GetMetricsResponse, error)
+}
+
+// UnimplementedPubSubMetricsServer should be embedded to have forward compatible implementations.
+type UnimplementedPubSubMetricsServer struct {
+}
+
+func (UnimplementedPubSubMetricsServer) GetMetrics(context.Context, *GetMetricsRequest) (*GetMetricsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMetrics not implemented")
+}
+
+// UnsafePubSubMetricsServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to PubSubMetricsServer will
+// result in compilation errors.
+type UnsafePubSubMetricsServer interface {
+	mustEmbedUnimplementedPubSubMetricsServer()
+}
+
+func RegisterPubSubMetricsServer(s grpc.ServiceRegistrar, srv PubSubMetricsServer) {
+	s.RegisterService(&PubSubMetrics_ServiceDesc, srv)
+}
+
+func _PubSubMetrics_GetMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMetricsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PubSubMetricsServer).GetMetrics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/dapr.proto.components.v1.PubSubMetrics/GetMetrics",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PubSubMetricsServer).GetMetrics(ctx, req.(*GetMetricsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// PubSubMetrics_ServiceDesc is the grpc.ServiceDesc for PubSubMetrics service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var PubSubMetrics_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "dapr.proto.components.v1.PubSubMetrics",
+	HandlerType: (*PubSubMetricsServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetMetrics",
+			Handler:    _PubSubMetrics_GetMetrics_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "dapr/proto/components/v1/pubsub.proto",
+}

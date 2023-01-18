@@ -14,10 +14,17 @@ limitations under the License.
 package components
 
 import (
+	"github.com/dapr/components-contrib/pubsub"
 	"github.com/dapr/components-contrib/pubsub/azure/servicebus/queues"
 	pubsubLoader "github.com/dapr/dapr/pkg/components/pubsub"
+	"github.com/dapr/kit/logger"
 )
 
 func init() {
-	pubsubLoader.DefaultRegistry.RegisterComponent(queues.NewAzureServiceBusQueues, "azure.servicebus.queues")
+	pubsubLoader.DefaultRegistry.RegisterComponent(func(l logger.Logger) pubsub.PubSub {
+		return queues.NewAzureServiceBusQueues(l)
+	}, "azure.servicebus.queues")
+	pubsubLoader.DefaultRegistry.RegisterMetricsBusComponent(func(l logger.Logger) pubsub.PubSubMetrics {
+		return queues.NewAzureServiceBusQueues(l)
+	}, "azure.servicebus.queues")
 }

@@ -329,20 +329,136 @@ func (a *api) validateAndGetPubsubAndTopic(pubsubName, topic string, reqMeta map
 	return thepubsub, pubsubName, topic, rawPayload, nil
 }
 
-func (a *api) IsActive(context.Context, *runtimev1pb.ScaledObjectRef) (*runtimev1pb.IsActiveResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method IsActive not implemented")
+type ScalerMetadata struct {
+	activationPendingMessageCount uint64
+	componentName string
+	pendingMessageCount uint64
+}
+
+func getMetadataValue(metadata map[string]string, name string) (string, error) {
+	value, ok := metadata[name];
+
+	if !ok {
+		return "", status.Errorf(codes.InvalidArgument, "\"%s\" was not specified in the scaler metadata.", name)
+	}
+
+	return value, nil
+}
+
+func getMetadataValueWithDefault(metadata map[string]string, name string, defaultValue uint64) (uint64, error) {
+	valueString, ok := metadata[name];
+
+	if ok {
+		value, err := strconv.ParseUint(valueString, 10, 64)
+
+		if err != nil {
+			return 0, err
+		}
+
+		return value, nil
+	}
+
+	return defaultValue, nil
+}
+
+func getMetadata(in *runtimev1pb.ScaledObjectRef) (*ScalerMetadata, error) {
+	activationPendingMessageCount, err := getMetadataValueWithDefault(in.ScalerMetadata, "activationPendingMessageCount", 1)
+
+	if err != nil {
+		return nil, err
+	}
+
+	componentName, err := getMetadataValue(in.ScalerMetadata, "componentName")
+
+	if err != nil {
+		return nil, err
+	}
+
+	pendingMessageCount, err := getMetadataValueWithDefault(in.ScalerMetadata, "pendingMessageCount", 5)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &ScalerMetadata{
+		activationPendingMessageCount: activationPendingMessageCount,
+		componentName:                 componentName,
+		pendingMessageCount:           pendingMessageCount,
+	}, nil;
+}
+
+func (a *api) getMetricsProvider(in *runtimev1pb.ScaledObjectRef) (pubsub.PubSubMetrics, *ScalerMetadata, error) {
+	metadata, err := getMetadata(in)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return a.pubsubAdapter.GetPubSubMetrics(metadata.componentName), metadata, nil
+}
+
+func (a *api) IsActive(ctx context.Context, in *runtimev1pb.ScaledObjectRef) (*runtimev1pb.IsActiveResponse, error) {
+	component, metadata, err := a.getMetricsProvider(in)
+
+	if (err != nil) {
+		return nil, err
+	}
+
+	metrics, err := component.GetMetrics(ctx, in.ScalerMetadata)
+
+	if (err != nil) {
+		return nil, err
+	}
+
+	response := runtimev1pb.IsActiveResponse{
+		Result: metrics.PendingMessageCount >= int64(metadata.activationPendingMessageCount),
+	}
+
+	return &response, nil
 }
 
 func (a *api) StreamIsActive(*runtimev1pb.ScaledObjectRef, runtimev1pb.ExternalScaler_StreamIsActiveServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamIsActive not implemented")
 }
 
-func (a *api) GetMetricSpec(context.Context, *runtimev1pb.ScaledObjectRef) (*runtimev1pb.GetMetricSpecResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetMetricSpec not implemented")
+func (a *api) GetMetricSpec(ctx context.Context, in *runtimev1pb.ScaledObjectRef) (*runtimev1pb.GetMetricSpecResponse, error) {
+	metadata, err := getMetadata(in)
+
+	if (err != nil) {
+		return nil, err
+	}
+
+	response := runtimev1pb.GetMetricSpecResponse{}
+
+	response.MetricSpecs = append(response.MetricSpecs, &runtimev1pb.MetricSpec{
+		MetricName: "pendingMessageCount",
+		TargetSize: int64(metadata.pendingMessageCount),
+	})
+
+	return &response, nil
 }
 
-func (a *api) GetMetrics(context.Context, *runtimev1pb.GetMetricsRequest) (*runtimev1pb.GetMetricsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetMetrics not implemented")
+func (a *api) GetMetrics(ctx context.Context, in *runtimev1pb.GetMetricsRequest) (*runtimev1pb.GetMetricsResponse, error) {
+	component, _, err := a.getMetricsProvider(in.ScaledObjectRef)
+
+	if (err != nil) {
+		return nil, err
+	}
+
+	metrics, err := component.GetMetrics(ctx, in.ScaledObjectRef.ScalerMetadata)
+
+	if (err != nil) {
+		return nil, err
+	}
+
+	response := runtimev1pb.GetMetricsResponse{}
+
+	response.MetricValues = append(response.MetricValues, &runtimev1pb.MetricValue{
+		MetricName: "pendingMessageCount",
+		MetricValue: metrics.PendingMessageCount,
+	})
+
+	return &response, nil
 }
 
 func (a *api) PublishEvent(ctx context.Context, in *runtimev1pb.PublishEventRequest) (*emptypb.Empty, error) {

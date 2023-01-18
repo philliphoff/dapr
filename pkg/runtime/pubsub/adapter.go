@@ -20,6 +20,7 @@ import (
 // Adapter is the interface for message buses.
 type Adapter interface {
 	GetPubSub(pubsubName string) contribPubsub.PubSub
+	GetPubSubMetrics(pubsubName string) contribPubsub.PubSubMetrics
 	Publish(req *contribPubsub.PublishRequest) error
 	BulkPublish(req *contribPubsub.BulkPublishRequest) (contribPubsub.BulkPublishResponse, error)
 }

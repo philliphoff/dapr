@@ -394,7 +394,19 @@ func (a *api) getMetricsProvider(in *runtimev1pb.ScaledObjectRef) (pubsub.PubSub
 		return nil, nil, err
 	}
 
-	return a.pubsubAdapter.GetPubSubMetrics(metadata.componentName), metadata, nil
+	component := a.pubsubAdapter.GetPubSub(metadata.componentName)
+
+	if component == nil {
+		return nil, nil, status.Errorf(codes.InvalidArgument, "No pub-sub component \"%s\" is configured.", metadata.componentName)
+	}
+
+	pubsubmetrics, ok := component.(pubsub.PubSubMetrics)
+
+	if !ok {
+		return nil, nil, status.Errorf(codes.InvalidArgument, "The pub-sub component \"%s\" does not support metrics.", metadata.componentName)
+	}
+
+	return pubsubmetrics, metadata, nil
 }
 
 func (a *api) IsActive(ctx context.Context, in *runtimev1pb.ScaledObjectRef) (*runtimev1pb.IsActiveResponse, error) {

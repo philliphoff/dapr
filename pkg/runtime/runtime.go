@@ -186,7 +186,6 @@ type DaprRuntime struct {
 	secretStores              map[string]secretstores.SecretStore
 	pubSubRegistry            *pubsubLoader.Registry
 	pubSubs                   map[string]pubsubItem // Key is "componentName"
-	pubSubMetrics             map[string]pubsubMetricsItem // Key is "componentName"
 	workflowComponents        map[string]wfs.Workflow
 	nameResolver              nr.Resolver
 	httpMiddlewareRegistry    *httpMiddlewareLoader.Registry
@@ -267,10 +266,6 @@ type pubsubItem struct {
 	namespaceScoped     bool
 }
 
-type pubsubMetricsItem struct {
-	component pubsub.PubSubMetrics
-}
-
 // NewDaprRuntime returns a new runtime with the given runtime config and global config.
 func NewDaprRuntime(runtimeConfig *Config, globalConfig *config.Configuration, accessControlList *config.AccessControlList, resiliencyProvider resiliency.Provider) *DaprRuntime {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -290,7 +285,6 @@ func NewDaprRuntime(runtimeConfig *Config, globalConfig *config.Configuration, a
 		secretStores:               map[string]secretstores.SecretStore{},
 		stateStores:                map[string]state.Store{},
 		pubSubs:                    map[string]pubsubItem{},
-		pubSubMetrics:              map[string]pubsubMetricsItem{},
 		topicsLock:                 &sync.RWMutex{},
 		inputBindingRoutes:         map[string]string{},
 		secretsConfiguration:       map[string]config.SecretsScope{},
@@ -2018,14 +2012,6 @@ func (a *DaprRuntime) Subscribe(ctx context.Context, name string, routes map[str
 // GetPubSub is an adapter method to find a pubsub by name.
 func (a *DaprRuntime) GetPubSub(pubsubName string) pubsub.PubSub {
 	ps, ok := a.pubSubs[pubsubName]
-	if !ok {
-		return nil
-	}
-	return ps.component
-}
-
-func (a *DaprRuntime) GetPubSubMetrics(pubsubName string) pubsub.PubSubMetrics {
-	ps, ok := a.pubSubMetrics[pubsubName]
 	if !ok {
 		return nil
 	}

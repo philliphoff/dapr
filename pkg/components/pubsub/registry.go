@@ -25,7 +25,6 @@ import (
 type Registry struct {
 	Logger       logger.Logger
 	messageBuses map[string]func(logger.Logger) pubsub.PubSub
-	metricsBuses map[string]func(logger.Logger) pubsub.PubSubMetrics
 }
 
 // DefaultRegistry is the singleton with the registry.
@@ -35,7 +34,6 @@ var DefaultRegistry *Registry = NewRegistry()
 func NewRegistry() *Registry {
 	return &Registry{
 		messageBuses: map[string]func(logger.Logger) pubsub.PubSub{},
-		metricsBuses: map[string]func(logger.Logger) pubsub.PubSubMetrics{},
 	}
 }
 
@@ -43,13 +41,6 @@ func NewRegistry() *Registry {
 func (p *Registry) RegisterComponent(componentFactory func(logger.Logger) pubsub.PubSub, names ...string) {
 	for _, name := range names {
 		p.messageBuses[createFullName(name)] = componentFactory
-	}
-}
-
-// RegisterComponent adds a new message bus with metrics to the registry.
-func (p *Registry) RegisterMetricsBusComponent(componentFactory func(logger.Logger) pubsub.PubSubMetrics, names ...string) {
-	for _, name := range names {
-		p.metricsBuses[createFullName(name)] = componentFactory
 	}
 }
 

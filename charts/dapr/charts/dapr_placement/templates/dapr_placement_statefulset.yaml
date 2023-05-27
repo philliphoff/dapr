@@ -1,7 +1,9 @@
+{{- if eq .Values.global.actors.enabled true }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: dapr-placement-server
+  namespace: {{ .Release.Namespace }}
   labels:
     app: dapr-placement-server
     {{- range $key, $value := .Values.global.k8sLabels }}
@@ -227,4 +229,5 @@ spec:
       storageClassName: {{ .Values.volumeclaims.storageClassName }}
     {{- end }}
   {{- end }}
+{{- end }}
 {{- end }}

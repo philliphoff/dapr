@@ -27,7 +27,12 @@ var envRegexp = regexp.MustCompile(`(?m)(,)\s*[a-zA-Z\_][a-zA-Z0-9\_]*=`)
 
 // GetAppID returns the app ID from the pod's annotation, or uses the pod's name as fallback.
 func GetAppID(pod metaV1.ObjectMeta) string {
-	return Annotations(pod.Annotations).GetStringOrDefault(annotations.KeyAppID, pod.GetName())
+	return annotations.New(pod.Annotations).GetStringOrDefault(annotations.KeyAppID, pod.GetName())
+}
+
+// GetMetricsEnabled returns true if metrics have been enabled, or false as fallback.
+func GetMetricsEnabled(pod metaV1.ObjectMeta) bool {
+	return annotations.New(pod.Annotations).GetBoolOrDefault(annotations.KeyEnableMetrics, annotations.DefaultEnableMetric)
 }
 
 // add env-vars from annotations.

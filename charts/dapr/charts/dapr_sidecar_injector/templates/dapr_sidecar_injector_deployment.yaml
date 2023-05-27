@@ -3,6 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: dapr-sidecar-injector
+  namespace: {{ .Release.Namespace }}
   labels:
     app: dapr-sidecar-injector
     {{- range $key, $value := .Values.global.k8sLabels }}
@@ -144,6 +145,10 @@ spec:
 {{- if .Values.ignoreEntrypointTolerations }}
         - name: IGNORE_ENTRYPOINT_TOLERATIONS
           value: "{{ .Values.ignoreEntrypointTolerations }}"
+{{- end }}
+{{- if not .Values.global.actors.enabled }}
+        - name: SKIP_PLACEMENT
+          value: "true"
 {{- end }}
         - name: SIDECAR_RUN_AS_NON_ROOT
           value: "{{ .Values.sidecarRunAsNonRoot }}"

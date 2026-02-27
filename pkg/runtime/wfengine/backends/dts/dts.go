@@ -32,6 +32,7 @@ import (
 	"github.com/dapr/durabletask-go/api/protos"
 	"github.com/dapr/durabletask-go/backend"
 	"github.com/dapr/durabletask-go/backend/local"
+	"github.com/dapr/durabletask-go/backend/runtimestate"
 	"github.com/dapr/kit/logger"
 )
 
@@ -50,6 +51,9 @@ type Backend struct {
 	client  protos.BackendServiceClient
 	conn    *grpc.ClientConn
 	taskHub string
+
+	maxConcurrentOrchestrations int32
+	maxConcurrentActivities     int32
 
 	// localTasks handles local task synchronization (WaitForOrchestratorCompletion, etc.)
 	localTasks *local.TasksBackend
@@ -71,6 +75,12 @@ type Options struct {
 	// ClientConn is an optional pre-established gRPC connection.
 	// If provided, Endpoint and TransportCredentials are ignored.
 	ClientConn *grpc.ClientConn
+	// MaxConcurrentOrchestrations is the max number of orchestration work items
+	// to process concurrently. DTS will not dispatch work if this is 0.
+	MaxConcurrentOrchestrations int32
+	// MaxConcurrentActivities is the max number of activity work items
+	// to process concurrently. DTS will not dispatch work if this is 0.
+	MaxConcurrentActivities int32
 }
 
 // ParseConnectionString parses a DTS connection string of the form
@@ -140,13 +150,24 @@ func New(opts Options) (*Backend, error) {
 		taskHub = "default"
 	}
 
+	maxOrch := opts.MaxConcurrentOrchestrations
+	if maxOrch <= 0 {
+		maxOrch = 10
+	}
+	maxAct := opts.MaxConcurrentActivities
+	if maxAct <= 0 {
+		maxAct = 10
+	}
+
 	return &Backend{
-		client:     protos.NewBackendServiceClient(conn),
-		conn:       conn,
-		taskHub:    taskHub,
-		localTasks: local.NewTasksBackend(),
-		orchCh:     make(chan *backend.OrchestrationWorkItem),
-		actCh:      make(chan *backend.ActivityWorkItem),
+		client:                      protos.NewBackendServiceClient(conn),
+		conn:                        conn,
+		taskHub:                     taskHub,
+		maxConcurrentOrchestrations: maxOrch,
+		maxConcurrentActivities:     maxAct,
+		localTasks:                  local.NewTasksBackend(),
+		orchCh:                      make(chan *backend.OrchestrationWorkItem),
+		actCh:                       make(chan *backend.ActivityWorkItem),
 	}, nil
 }
 
@@ -325,7 +346,10 @@ func (b *Backend) receiveWorkItems(ctx context.Context) {
 }
 
 func (b *Backend) runWorkItemStream(ctx context.Context) error {
-	stream, err := b.client.GetWorkItems(b.withTaskHub(ctx), &protos.GetWorkItemsRequest{})
+	stream, err := b.client.GetWorkItems(b.withTaskHub(ctx), &protos.GetWorkItemsRequest{
+		MaxConcurrentOrchestrationWorkItems: b.maxConcurrentOrchestrations,
+		MaxConcurrentActivityWorkItems:      b.maxConcurrentActivities,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to open GetWorkItems stream: %w", err)
 	}
@@ -413,9 +437,25 @@ func (b *Backend) NextActivityWorkItem(ctx context.Context) (*backend.ActivityWo
 func (b *Backend) CompleteOrchestrationWorkItem(ctx context.Context, wi *backend.OrchestrationWorkItem) error {
 	token, _ := wi.Properties[completionTokenKey].(string)
 
+	// Convert pending messages from the runtime state format to the proto format.
+	var newMessages []*protos.OrchestratorMessage
+	if wi.State != nil {
+		for _, msg := range wi.State.GetPendingMessages() {
+			newMessages = append(newMessages, &protos.OrchestratorMessage{
+				Instance: &protos.OrchestrationInstance{InstanceId: msg.GetTargetInstanceID()},
+				Event:    msg.GetHistoryEvent(),
+			})
+		}
+	}
+
 	req := &protos.CompleteOrchestrationWorkItemRequest{
 		CompletionToken: token,
 		Instance:        &protos.OrchestrationInstance{InstanceId: string(wi.InstanceID)},
+		RuntimeStatus:   runtimestate.RuntimeStatus(wi.State),
+		CustomStatus:    wi.State.GetCustomStatus(),
+		NewTasks:        wi.State.GetPendingTasks(),
+		NewTimers:       wi.State.GetPendingTimers(),
+		NewMessages:     newMessages,
 	}
 
 	_, err := b.client.CompleteOrchestrationWorkItem(b.withTaskHub(ctx), req)

@@ -72,6 +72,22 @@ func main() {
 		log.Fatalf("Failed to register activity: %v", err)
 	}
 
+	// Start the health check HTTP server FIRST so daprd can detect the app.
+	appPort := os.Getenv("APP_PORT")
+	if appPort == "" {
+		appPort = "3000"
+	}
+	go func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+		log.Printf("App listening on port %s", appPort)
+		if err := http.ListenAndServe(":"+appPort, mux); err != nil {
+			log.Printf("HTTP server error: %v", err)
+		}
+	}()
+
 	// Connect to the Dapr sidecar via gRPC.
 	daprPort := os.Getenv("DAPR_GRPC_PORT")
 	if daprPort == "" {
@@ -92,29 +108,12 @@ func main() {
 		log.Fatalf("Failed to start work item listener: %v", err)
 	}
 
-	// Start a simple HTTP server for health checks.
-	go func() {
-		mux := http.NewServeMux()
-		mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		})
-		port := os.Getenv("APP_PORT")
-		if port == "" {
-			port = "3000"
-		}
-		log.Printf("App listening on port %s", port)
-		if err := http.ListenAndServe(":"+port, mux); err != nil {
-			log.Printf("HTTP server error: %v", err)
-		}
-	}()
-
 	// Give the sidecar a moment to initialize.
 	time.Sleep(5 * time.Second)
 
 	// Schedule an order-processing workflow.
 	payload := OrderPayload{ItemName: "Widget", Quantity: 3}
 	id, err := backendClient.ScheduleNewOrchestration(ctx, "ProcessOrder",
-		api.WithInstanceID("order-001"),
 		api.WithInput(payload),
 	)
 	if err != nil {

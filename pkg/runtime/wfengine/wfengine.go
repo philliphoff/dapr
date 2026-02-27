@@ -71,11 +71,17 @@ type engine struct {
 	actors            actors.Interface
 	getWorkItemsCount *atomic.Int32
 
-	worker  backend.TaskHubWorker
-	backend *backendactors.Actors
-	client  workflows.Workflow
+	worker        backend.TaskHubWorker
+	actorsBackend *backendactors.Actors // nil when using external backend
+	client        workflows.Workflow
 
 	registerGrpcServerFn func(grpcServer grpc.ServiceRegistrar)
+
+	// backendManager is checked in Run() to see if an external backend (e.g.
+	// DTS) was loaded by the component processor. If so, the engine is
+	// re-initialized with the external backend before starting the worker.
+	backendManager processor.WorkflowBackendManager
+	opts           Options
 }
 
 func New(opts Options) Interface {
@@ -84,7 +90,70 @@ func New(opts Options) Interface {
 		retPolicy = opts.Spec.StateRetentionPolicy
 	}
 
-	// If no backend was initialized by the manager, create a backend backed by actors
+	// Always create the actors-based engine first. The external backend (if
+	// any) will be wired in during Run(), after the component processor has
+	// had a chance to initialize workflow backend components.
+	e := newWithActorsBackend(opts, retPolicy)
+	e.backendManager = opts.BackendManager
+	e.opts = opts
+	return e
+}
+
+// newWithExternalBackend creates an engine using a pre-configured external backend (e.g. DTS).
+func newWithExternalBackend(opts Options, be backend.Backend) *engine {
+	var getWorkItemsCount atomic.Int32
+	executor, registerGrpcServerFn := backend.NewGrpcExecutor(be, log,
+		backend.WithOnGetWorkItemsConnectionCallback(func(ctx context.Context) error {
+			getWorkItemsCount.Add(1)
+			return nil
+		}),
+		backend.WithOnGetWorkItemsDisconnectCallback(func(ctx context.Context) error {
+			getWorkItemsCount.Add(-1)
+			return nil
+		}),
+		backend.WithStreamSendTimeout(time.Second*10),
+	)
+
+	var topts []backend.NewTaskWorkerOptions
+	if opts.Spec.GetMaxConcurrentWorkflowInvocations() != nil {
+		topts = []backend.NewTaskWorkerOptions{
+			backend.WithMaxParallelism(*opts.Spec.GetMaxConcurrentWorkflowInvocations()),
+		}
+	}
+
+	oworker := backend.NewOrchestrationWorker(backend.OrchestratorOptions{
+		Backend:  be,
+		Executor: executor,
+		Logger:   wfBackendLogger,
+		AppID:    opts.AppID,
+	}, topts...)
+
+	topts = nil
+	if opts.Spec.GetMaxConcurrentActivityInvocations() != nil {
+		topts = []backend.NewTaskWorkerOptions{
+			backend.WithMaxParallelism(*opts.Spec.GetMaxConcurrentActivityInvocations()),
+		}
+	}
+	aworker := backend.NewActivityTaskWorker(be, executor, wfBackendLogger, topts...)
+	worker := backend.NewTaskHubWorker(be, oworker, aworker, wfBackendLogger)
+
+	return &engine{
+		appID:                opts.AppID,
+		namespace:            opts.Namespace,
+		actors:               opts.Actors,
+		worker:               worker,
+		actorsBackend:        nil,
+		registerGrpcServerFn: registerGrpcServerFn,
+		getWorkItemsCount:    &getWorkItemsCount,
+		client: &client{
+			logger: wfBackendLogger,
+			client: backend.NewTaskHubClient(be),
+		},
+	}
+}
+
+// newWithActorsBackend creates an engine using the built-in actors-based backend.
+func newWithActorsBackend(opts Options, retPolicy *config.WorkflowStateRetentionPolicy) *engine {
 	abackend := backendactors.New(backendactors.Options{
 		AppID:           opts.AppID,
 		Namespace:       opts.Namespace,
@@ -164,7 +233,7 @@ func New(opts Options) Interface {
 		namespace:            opts.Namespace,
 		actors:               opts.Actors,
 		worker:               worker,
-		backend:              abackend,
+		actorsBackend:        abackend,
 		registerGrpcServerFn: registerGrpcServerFn,
 		getWorkItemsCount:    &getWorkItemsCount,
 		client: &client{
@@ -179,10 +248,35 @@ func (wfe *engine) RegisterGrpcServer(server *grpc.Server) {
 }
 
 func (wfe *engine) Run(ctx context.Context) error {
-	_, err := wfe.actors.Router(ctx)
-	if err != nil {
-		<-ctx.Done()
-		return ctx.Err()
+	// Wait for the component processor to finish loading initial components.
+	// This ensures any configured workflow backend (e.g. DTS) has been
+	// initialized before we decide which backend to use.
+	if wfe.backendManager != nil {
+		select {
+		case <-wfe.backendManager.Ready():
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+
+		if externalBackend, ok := wfe.backendManager.Backend(); ok && externalBackend != nil {
+			log.Info("Using external workflow backend instead of actors")
+			ext := newWithExternalBackend(wfe.opts, externalBackend)
+			wfe.worker = ext.worker
+			wfe.actorsBackend = nil
+			wfe.client = ext.client
+			wfe.getWorkItemsCount = ext.getWorkItemsCount
+			wfe.registerGrpcServerFn = ext.registerGrpcServerFn
+		}
+	}
+
+	// For actor-based backends, wait for the actor router to be available.
+	// External backends (e.g. DTS) don't need actors.
+	if wfe.actorsBackend != nil {
+		_, err := wfe.actors.Router(ctx)
+		if err != nil {
+			<-ctx.Done()
+			return ctx.Err()
+		}
 	}
 
 	// Start the Durable Task worker, which will allow workflows to be scheduled and execute.
@@ -206,7 +300,10 @@ func (wfe *engine) Client() workflows.Workflow {
 }
 
 func (wfe *engine) ActivityActorType() string {
-	return wfe.backend.ActivityActorType()
+	if wfe.actorsBackend != nil {
+		return wfe.actorsBackend.ActivityActorType()
+	}
+	return ""
 }
 
 func (wfe *engine) RuntimeMetadata() *runtimev1pb.MetadataWorkflows {

@@ -24,6 +24,7 @@ import (
 	"github.com/dapr/dapr/pkg/components/pubsub"
 	"github.com/dapr/dapr/pkg/components/secretstores"
 	"github.com/dapr/dapr/pkg/components/state"
+	"github.com/dapr/dapr/pkg/components/wfbackend"
 )
 
 // Options is the options to configure the registries
@@ -38,6 +39,7 @@ type Options struct {
 	httpMiddleware     *http.Registry
 	crypto             *crypto.Registry
 	conversation       *conversation.Registry
+	wfbackend          *wfbackend.Registry
 	componentsCallback ComponentsCallback
 	reporter           Reporter
 }
@@ -54,6 +56,7 @@ func NewOptions() *Options {
 		httpMiddleware: http.DefaultRegistry,
 		crypto:         crypto.DefaultRegistry,
 		conversation:   conversation.DefaultRegistry,
+		wfbackend:      wfbackend.DefaultRegistry,
 	}
 }
 
@@ -114,6 +117,12 @@ func (o *Options) WithCryptoProviders(registry *crypto.Registry) *Options {
 // WithConversations adds conversation components to the runtime.
 func (o *Options) WithConversations(registry *conversation.Registry) *Options {
 	o.conversation = registry
+	return o
+}
+
+// WithWorkflowBackends adds workflow backend components to the runtime.
+func (o *Options) WithWorkflowBackends(registry *wfbackend.Registry) *Options {
+	o.wfbackend = registry
 	return o
 }
 

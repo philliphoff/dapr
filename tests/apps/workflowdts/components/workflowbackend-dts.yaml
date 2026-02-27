@@ -1,0 +1,12 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: dts
+spec:
+  type: workflowbackend.durabletaskscheduler
+  version: v1
+  metadata:
+  - name: endpoint
+    value: "Endpoint=http://localhost:8080;Authentication=None"
+  - name: taskhub
+    value: "default"

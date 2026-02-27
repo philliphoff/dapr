@@ -44,6 +44,7 @@ import (
 	"github.com/dapr/dapr/pkg/runtime/processor/secret"
 	"github.com/dapr/dapr/pkg/runtime/processor/state"
 	"github.com/dapr/dapr/pkg/runtime/processor/subscriber"
+	procwfbackend "github.com/dapr/dapr/pkg/runtime/processor/wfbackend"
 	rtpubsub "github.com/dapr/dapr/pkg/runtime/pubsub"
 	"github.com/dapr/dapr/pkg/runtime/registry"
 	"github.com/dapr/dapr/pkg/security"
@@ -187,6 +188,12 @@ func New(opts Options) *Processor {
 		reporter = opts.Reporter
 	}
 
+	wfbackendMgr := procwfbackend.New(procwfbackend.Options{
+		Registry:       opts.Registry.WorkflowBackends(),
+		ComponentStore: opts.ComponentStore,
+		Meta:           opts.Meta,
+	})
+
 	return &Processor{
 		appID:                      opts.ID,
 		pendingHTTPEndpoints:       make(chan httpendpointsapi.HTTPEndpoint),
@@ -198,6 +205,7 @@ func New(opts Options) *Processor {
 		state:                      state,
 		binding:                    binding,
 		secret:                     secret,
+		workflowBackend:            wfbackendMgr,
 		security:                   opts.Security,
 		subscriber:                 subscriber,
 		reporter:                   reporter,
@@ -237,6 +245,7 @@ func New(opts Options) *Processor {
 				Registry: opts.Registry.Conversations(),
 				Store:    opts.ComponentStore,
 			}),
+			components.CategoryWorkflowBackend: wfbackendMgr,
 		},
 	}
 }

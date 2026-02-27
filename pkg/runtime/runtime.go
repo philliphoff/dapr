@@ -634,6 +634,10 @@ func (a *DaprRuntime) initRuntime(ctx context.Context) error {
 
 	a.flushOutstandingComponents(ctx)
 
+	// Signal to the workflow engine that initial component processing is
+	// complete - any workflow backend component has been initialized by now.
+	a.processor.WorkflowBackend().MarkReady()
+
 	err = a.loadHTTPEndpoints(ctx)
 	if err != nil {
 		log.Warnf("failed to load HTTP endpoints: %s", err)

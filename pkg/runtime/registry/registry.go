@@ -27,6 +27,7 @@ import (
 	"github.com/dapr/dapr/pkg/components/pubsub"
 	"github.com/dapr/dapr/pkg/components/secretstores"
 	"github.com/dapr/dapr/pkg/components/state"
+	"github.com/dapr/dapr/pkg/components/wfbackend"
 	messagingv1 "github.com/dapr/dapr/pkg/messaging/v1"
 	operatorv1 "github.com/dapr/dapr/pkg/proto/operator/v1"
 	"github.com/dapr/dapr/pkg/runtime/compstore"
@@ -53,6 +54,7 @@ type Registry struct {
 	httpMiddleware *http.Registry
 	crypto         *crypto.Registry
 	conversations  *conversation.Registry
+	wfbackend      *wfbackend.Registry
 	componentCb    ComponentsCallback
 	reporter       Reporter
 }
@@ -69,6 +71,7 @@ func New(opts *Options) *Registry {
 		httpMiddleware: opts.httpMiddleware,
 		crypto:         opts.crypto,
 		conversations:  opts.conversation,
+		wfbackend:      opts.wfbackend,
 		componentCb:    opts.componentsCallback,
 		reporter:       opts.reporter,
 	}
@@ -112,6 +115,10 @@ func (r *Registry) Crypto() *crypto.Registry {
 
 func (r *Registry) Conversations() *conversation.Registry {
 	return r.conversations
+}
+
+func (r *Registry) WorkflowBackends() *wfbackend.Registry {
+	return r.wfbackend
 }
 
 func (r *Registry) ComponentsCallback() ComponentsCallback {

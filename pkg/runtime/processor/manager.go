@@ -64,6 +64,13 @@ type BindingManager interface {
 
 type WorkflowBackendManager interface {
 	Backend() (backend.Backend, bool)
+	// Ready returns a channel that closes when the manager has determined whether
+	// an external backend is available. After this channel closes, Backend() returns
+	// the final result.
+	Ready() <-chan struct{}
+	// MarkReady signals that initial component processing is complete and no more
+	// workflow backend components will be loaded during startup.
+	MarkReady()
 }
 
 func (p *Processor) managerFromComp(comp componentsapi.Component) (manager, error) {

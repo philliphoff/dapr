@@ -139,7 +139,15 @@ func New(opts Options) (*Backend, error) {
 			creds = insecure.NewCredentials()
 		}
 		var err error
-		conn, err = grpc.NewClient(opts.Endpoint, grpc.WithTransportCredentials(creds))
+		// Use passthrough scheme to avoid gRPC's default DNS resolver,
+		// which can timeout in environments where DNS for "localhost" is slow.
+		target := "passthrough:///" + opts.Endpoint
+		conn, err = grpc.NewClient(target,
+			grpc.WithTransportCredentials(creds),
+			grpc.WithConnectParams(grpc.ConnectParams{
+				MinConnectTimeout: 5 * time.Second,
+			}),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to DTS endpoint %q: %w", opts.Endpoint, err)
 		}
@@ -327,9 +335,14 @@ func (b *Backend) GetOrchestrationRuntimeState(ctx context.Context, owi *backend
 	if err != nil {
 		return nil, fmt.Errorf("DTS GetOrchestrationRuntimeState failed: %w", err)
 	}
-	return &protos.OrchestrationRuntimeState{
-		OldEvents: resp.GetHistory(),
-	}, nil
+	history := resp.GetHistory()
+	// Use NewOrchestrationRuntimeState to properly process history events
+	// through addEvent(), which sets derived fields like StartEvent and
+	// CompletedEvent needed for correct RuntimeStatus().
+	state := runtimestate.NewOrchestrationRuntimeState(
+		string(owi.InstanceID), nil, history,
+	)
+	return state, nil
 }
 
 // receiveWorkItems opens a GetWorkItems stream from DTS and fans out to orchestration/activity channels.
@@ -365,12 +378,22 @@ func (b *Backend) runWorkItemStream(ctx context.Context) error {
 		switch {
 		case wi.GetOrchestratorRequest() != nil:
 			oreq := wi.GetOrchestratorRequest()
+			log.Debugf("DTS orchestration work item for %s: %d past events, %d new events",
+				oreq.GetInstanceId(), len(oreq.GetPastEvents()), len(oreq.GetNewEvents()))
+
+			// Only pre-create state from past events if DTS provided them.
+			// DTS often sends empty pastEvents, expecting the worker to
+			// fetch state via GetOrchestrationRuntimeState.
+			var state *protos.OrchestrationRuntimeState
+			if len(oreq.GetPastEvents()) > 0 {
+				state = runtimestate.NewOrchestrationRuntimeState(
+					oreq.GetInstanceId(), nil, oreq.GetPastEvents(),
+				)
+			}
 			owi := &backend.OrchestrationWorkItem{
 				InstanceID: api.InstanceID(oreq.GetInstanceId()),
 				NewEvents:  oreq.GetNewEvents(),
-				State: &protos.OrchestrationRuntimeState{
-					OldEvents: oreq.GetPastEvents(),
-				},
+				State:      state,
 				Properties: map[string]interface{}{
 					completionTokenKey: token,
 				},
@@ -448,14 +471,23 @@ func (b *Backend) CompleteOrchestrationWorkItem(ctx context.Context, wi *backend
 		}
 	}
 
+	// Sanitize pending tasks: the Go durabletask-go proto has Dapr-specific
+	// extensions (TaskExecutionId at field 5, RerunParentInstanceInfo at field
+	// 6) that conflict with the canonical proto used by DTS (tags at field 5).
+	// Strip these to avoid protobuf deserialization errors on the DTS side.
+	newTasks := sanitizePendingTasks(wi.State.GetPendingTasks())
+
 	req := &protos.CompleteOrchestrationWorkItemRequest{
 		CompletionToken: token,
 		Instance:        &protos.OrchestrationInstance{InstanceId: string(wi.InstanceID)},
 		RuntimeStatus:   runtimestate.RuntimeStatus(wi.State),
 		CustomStatus:    wi.State.GetCustomStatus(),
-		NewTasks:        wi.State.GetPendingTasks(),
+		NewTasks:        newTasks,
 		NewTimers:       wi.State.GetPendingTimers(),
 		NewMessages:     newMessages,
+		// Send new history events so DTS can include them in subsequent
+		// work items' pastEvents for proper orchestration replay.
+		NewHistory: sanitizeHistoryEvents(wi.State.GetNewEvents()),
 	}
 
 	_, err := b.client.CompleteOrchestrationWorkItem(b.withTaskHub(ctx), req)
@@ -463,6 +495,62 @@ func (b *Backend) CompleteOrchestrationWorkItem(ctx context.Context, wi *backend
 		return fmt.Errorf("DTS CompleteOrchestrationWorkItem failed: %w", err)
 	}
 	return nil
+}
+
+// sanitizePendingTasks strips Dapr-specific proto extensions from task events
+// so they are compatible with the canonical durabletask-protobuf schema used
+// by DTS.
+func sanitizePendingTasks(tasks []*protos.HistoryEvent) []*protos.HistoryEvent {
+	return sanitizeHistoryEvents(tasks)
+}
+
+// sanitizeHistoryEvents reconstructs HistoryEvent messages, stripping
+// Dapr-specific proto extensions to stay compatible with the canonical
+// durabletask-protobuf schema used by DTS.
+//
+// Key conflicts:
+//   - HistoryEvent field 30 is "Router" (TaskRouter) in Dapr's Go proto but
+//     "executionRewound" (ExecutionRewoundEvent) in the canonical proto.
+//   - TaskScheduledEvent field 5 is "taskExecutionId" (string) in Go proto but
+//     "tags" (map<string,string>) in the canonical proto.
+//
+// To avoid any field leaking through (including unknown fields preserved by
+// Go's protobuf library), every event is reconstructed with only the canonical
+// fields.
+func sanitizeHistoryEvents(events []*protos.HistoryEvent) []*protos.HistoryEvent {
+	if len(events) == 0 {
+		return events
+	}
+	out := make([]*protos.HistoryEvent, len(events))
+	for i, event := range events {
+		// Reconstruct with only the two universal HistoryEvent fields
+		// plus the oneof event type (sanitized where needed).
+		clean := &protos.HistoryEvent{
+			EventId:   event.GetEventId(),
+			Timestamp: event.GetTimestamp(),
+		}
+
+		switch {
+		case event.GetTaskScheduled() != nil:
+			ts := event.GetTaskScheduled()
+			clean.EventType = &protos.HistoryEvent_TaskScheduled{
+				TaskScheduled: &protos.TaskScheduledEvent{
+					Name:               ts.GetName(),
+					Version:            ts.GetVersion(),
+					Input:              ts.GetInput(),
+					ParentTraceContext: ts.GetParentTraceContext(),
+				},
+			}
+		default:
+			// For all other event types, copy the oneof as-is. The
+			// Router field (field 30) is NOT part of the EventType
+			// oneof copy since we're creating a new HistoryEvent.
+			clean.EventType = event.EventType
+		}
+
+		out[i] = clean
+	}
+	return out
 }
 
 // AbandonOrchestrationWorkItem implements backend.Backend.

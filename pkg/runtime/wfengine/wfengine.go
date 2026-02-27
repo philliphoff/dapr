@@ -33,6 +33,7 @@ import (
 	"github.com/dapr/dapr/pkg/runtime/compstore"
 	"github.com/dapr/dapr/pkg/runtime/processor"
 	backendactors "github.com/dapr/dapr/pkg/runtime/wfengine/backends/actors"
+	"github.com/dapr/durabletask-go/api/protos"
 	"github.com/dapr/durabletask-go/backend"
 	"github.com/dapr/kit/logger"
 )
@@ -75,6 +76,9 @@ type engine struct {
 	actorsBackend *backendactors.Actors // nil when using external backend
 	client        workflows.Workflow
 
+	// sidecarProxy is registered once with the gRPC server and forwards calls
+	// to whichever executor is currently active (actors or DTS).
+	sidecarProxy *sidecarServiceProxy
 	registerGrpcServerFn func(grpcServer grpc.ServiceRegistrar)
 
 	// backendManager is checked in Run() to see if an external backend (e.g.
@@ -99,10 +103,18 @@ func New(opts Options) Interface {
 	return e
 }
 
-// newWithExternalBackend creates an engine using a pre-configured external backend (e.g. DTS).
-func newWithExternalBackend(opts Options, be backend.Backend) *engine {
+// externalBackendResult holds the results of creating an external backend engine.
+type externalBackendResult struct {
+	worker            backend.TaskHubWorker
+	client            workflows.Workflow
+	getWorkItemsCount *atomic.Int32
+	sidecarServer     protos.TaskHubSidecarServiceServer
+}
+
+// newWithExternalBackend creates engine components using a pre-configured external backend (e.g. DTS).
+func newWithExternalBackend(opts Options, be backend.Backend) *externalBackendResult {
 	var getWorkItemsCount atomic.Int32
-	executor, registerGrpcServerFn := backend.NewGrpcExecutor(be, log,
+	executor, _ := backend.NewGrpcExecutor(be, log,
 		backend.WithOnGetWorkItemsConnectionCallback(func(ctx context.Context) error {
 			getWorkItemsCount.Add(1)
 			return nil
@@ -137,14 +149,15 @@ func newWithExternalBackend(opts Options, be backend.Backend) *engine {
 	aworker := backend.NewActivityTaskWorker(be, executor, wfBackendLogger, topts...)
 	worker := backend.NewTaskHubWorker(be, oworker, aworker, wfBackendLogger)
 
-	return &engine{
-		appID:                opts.AppID,
-		namespace:            opts.Namespace,
-		actors:               opts.Actors,
-		worker:               worker,
-		actorsBackend:        nil,
-		registerGrpcServerFn: registerGrpcServerFn,
-		getWorkItemsCount:    &getWorkItemsCount,
+	sidecarServer, ok := executor.(protos.TaskHubSidecarServiceServer)
+	if !ok {
+		panic("grpcExecutor does not implement TaskHubSidecarServiceServer")
+	}
+
+	return &externalBackendResult{
+		worker:            worker,
+		getWorkItemsCount: &getWorkItemsCount,
+		sidecarServer:     sidecarServer,
 		client: &client{
 			logger: wfBackendLogger,
 			client: backend.NewTaskHubClient(be),
@@ -228,12 +241,20 @@ func newWithActorsBackend(opts Options, retPolicy *config.WorkflowStateRetention
 	)
 	worker := backend.NewTaskHubWorker(abackend, oworker, aworker, wfBackendLogger)
 
+	// Create a proxy so the gRPC service can be swapped at runtime.
+	sidecarServer, ok := executor.(protos.TaskHubSidecarServiceServer)
+	if !ok {
+		panic("grpcExecutor does not implement TaskHubSidecarServiceServer")
+	}
+	proxy := newSidecarServiceProxy(sidecarServer)
+
 	return &engine{
 		appID:                opts.AppID,
 		namespace:            opts.Namespace,
 		actors:               opts.Actors,
 		worker:               worker,
 		actorsBackend:        abackend,
+		sidecarProxy:         proxy,
 		registerGrpcServerFn: registerGrpcServerFn,
 		getWorkItemsCount:    &getWorkItemsCount,
 		client: &client{
@@ -244,7 +265,13 @@ func newWithActorsBackend(opts Options, retPolicy *config.WorkflowStateRetention
 }
 
 func (wfe *engine) RegisterGrpcServer(server *grpc.Server) {
-	wfe.registerGrpcServerFn(server)
+	// Register the proxy with the gRPC server. The proxy delegates to
+	// whichever executor is currently active.
+	if wfe.sidecarProxy != nil {
+		wfe.sidecarProxy.register(server)
+	} else {
+		wfe.registerGrpcServerFn(server)
+	}
 }
 
 func (wfe *engine) Run(ctx context.Context) error {
@@ -265,7 +292,11 @@ func (wfe *engine) Run(ctx context.Context) error {
 			wfe.actorsBackend = nil
 			wfe.client = ext.client
 			wfe.getWorkItemsCount = ext.getWorkItemsCount
-			wfe.registerGrpcServerFn = ext.registerGrpcServerFn
+			// Swap the proxy's target to the DTS executor so that the
+			// SDK-facing gRPC service routes to the external backend.
+			if wfe.sidecarProxy != nil {
+				wfe.sidecarProxy.swap(ext.sidecarServer)
+			}
 		}
 	}
 

@@ -19,6 +19,7 @@ import (
 	"net"
 	"os/exec"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -112,6 +113,7 @@ func (c *Container) Run(t *testing.T, ctx context.Context) {
 	}
 	args = append(args, c.image)
 
+	t.Logf("Running: docker %s", strings.Join(args, " "))
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "docker run failed: %s", string(out))
@@ -121,6 +123,12 @@ func (c *Container) Run(t *testing.T, ctx context.Context) {
 
 func (c *Container) Cleanup(t *testing.T) {
 	t.Helper()
+
+	// Capture container logs before removal for debugging.
+	logCmd := exec.Command("docker", "logs", c.name)
+	if logOut, err := logCmd.CombinedOutput(); err == nil {
+		t.Logf("Docker container %s logs:\n%s", c.name, string(logOut))
+	}
 
 	cmd := exec.Command("docker", "rm", "-f", c.name)
 	out, err := cmd.CombinedOutput()

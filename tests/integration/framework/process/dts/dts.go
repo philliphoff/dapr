@@ -16,11 +16,13 @@ package dts
 import (
 	"context"
 	"fmt"
+	"net"
 	"strconv"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/dapr/dapr/tests/integration/framework/process/docker"
-	"github.com/dapr/dapr/tests/integration/framework/process/ports"
 )
 
 const (
@@ -61,10 +63,9 @@ func New(t *testing.T, fopts ...Option) *DTS {
 		fopt(&opts)
 	}
 
-	// Reserve 2 ports: gRPC and dashboard
-	fp := ports.Reserve(t, 2)
-	grpcPort := fp.Port(t)
-	dashPort := fp.Port(t)
+	// Find two free high ports for gRPC and dashboard by binding to :0.
+	grpcPort := freePort(t)
+	dashPort := freePort(t)
 
 	c := docker.New(t, emulatorImage, 0,
 		docker.WithPort(grpcPort, grpcContainerPort),
@@ -78,6 +79,16 @@ func New(t *testing.T, fopts ...Option) *DTS {
 		grpcPort:  grpcPort,
 		taskHub:   opts.taskHub,
 	}
+}
+
+// freePort finds a free TCP port by binding to :0 and immediately closing.
+func freePort(t *testing.T) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	port := ln.Addr().(*net.TCPAddr).Port
+	require.NoError(t, ln.Close())
+	return port
 }
 
 func (d *DTS) Run(t *testing.T, ctx context.Context) {
@@ -104,7 +115,7 @@ func (d *DTS) Address() string {
 
 // ConnectionString returns a DTS connection string suitable for component metadata.
 func (d *DTS) ConnectionString() string {
-	return fmt.Sprintf("Endpoint=http://localhost:%d;Authentication=None", d.grpcPort)
+	return fmt.Sprintf("Endpoint=http://127.0.0.1:%d;Authentication=None", d.grpcPort)
 }
 
 // TaskHub returns the configured task hub name.

@@ -5,6 +5,8 @@ patterns (constant VUs, constant iterations, max VUs, delayed workflows, and
 varying payload sizes). The tests are implemented in `workflow_test.go` and 
 driven by k6.
 
+> **Note:** These tests currently run against the default **actors-based** workflow backend. The Dapr workflow engine also supports the **Durable Task Scheduler (DTS)** backend via a `workflowbackend.durabletaskscheduler` component. See [pkg/runtime/wfengine/README.md](../../../pkg/runtime/wfengine/README.md#workflow-backends) for details on workflow backends.
+
 ## Glossary
 
 - VU (Virtual User): The number of concurrent workflows running at a time

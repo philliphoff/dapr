@@ -4,6 +4,45 @@ The Dapr Workflow engine enables developers to author workflows using code and e
 
 This README is designed to be used by maintainers to help with getting started. This README will be updated with more information as the project progresses.
 
+## Workflow Backends
+
+The workflow engine supports two backends:
+
+| Backend | Component type | Description |
+| - | - | - |
+| **Actors** (default) | *(built-in, no component required)* | Uses Dapr's internal actor framework to manage workflow state. Requires a placement service and an actor-compatible state store. This is the default when no workflow backend component is configured. |
+| **Durable Task Scheduler (DTS)** | `workflowbackend.durabletaskscheduler` | Delegates workflow state management to an external [Durable Task Scheduler](https://learn.microsoft.com/azure/durable-task-scheduler/) service. No placement service or state store is required. |
+
+To use the DTS backend, add a `workflowbackend.durabletaskscheduler` component to your resources directory:
+
+```yaml
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: dts
+spec:
+  type: workflowbackend.durabletaskscheduler
+  version: v1
+  metadata:
+  - name: endpoint
+    value: "Endpoint=http://localhost:8080;Authentication=None"
+  - name: taskhub
+    value: "default"
+```
+
+For local development, you can run the DTS emulator:
+
+```bash
+docker run -d --name dts-emulator \
+  -p 8080:8080 \
+  -p 8082:8082 \
+  mcr.microsoft.com/dts/dts-emulator:latest
+```
+
+The emulator dashboard is available at `http://localhost:8082`.
+
+The Dapr workflow API (HTTP/gRPC) works identically regardless of which backend is configured. See [tests/apps/workflowdts](../../../tests/apps/workflowdts/) and [tests/apps/workflowsapp-dts](../../../tests/apps/workflowsapp-dts/) for sample applications using the DTS backend.
+
 ## Building Daprd
 
 The workflow engine is entirely encapsulated within the [dapr sidecar (a.k.a. daprd)](https://docs.dapr.io/concepts/dapr-services/sidecar/). All dependencies are compiled directly into the binary.
@@ -22,6 +61,8 @@ The following bash command can be used to build a version of Daprd that supports
 DEBUG=1 make build
 ```
 * `DEBUG=1` is required to attach debuggers. This should never be set for production or performance testing workloads.
+
+### Running with the actors backend (default)
 
 After building, the following bash command can be run from the project root to test the code:
 
@@ -55,6 +96,14 @@ If you want to see the full set of logs, run daprd with verbose logging enabled 
 ```
 DEBU[0000] orchestration-processor: waiting for new work items...  app_id=wfapp instance=XYZ scope=dapr.runtime.wfengine type=log ver=edge
 DEBU[0000] activity-processor: waiting for new work items...       app_id=wfapp instance=XYZ scope=dapr.runtime.wfengine type=log ver=edge
+```
+
+### Running with the DTS backend
+
+To use DTS instead, point `--resources-path` at a directory containing a `workflowbackend.durabletaskscheduler` component (see [Workflow Backends](#workflow-backends) above). No placement service or actor state store is needed:
+
+```bash
+./dist/linux_amd64/debug/daprd --app-id wfapp --dapr-grpc-port 4001 --resources-path ./tests/apps/workflowdts/components/
 ```
 
 ## Running tests
@@ -122,6 +171,10 @@ Total tests: 33
 ```
 
 ## How the workflow engine works
+
+### Actors backend
+
+> The following section describes the internal architecture of the **actors backend**, which is the default. When using the DTS backend, workflow state and scheduling are managed entirely by the external DTS service and the details below do not apply.
 
 The Dapr Workflow engine introduced a new concept of *internal actors*. These are actors that are registered and implemented directly in Daprd with no host application dependency. Just like regular actors, they have turn-based concurrency, support reminders, and are scaled out using the placement service. Internal actors also leverage the configured state store for actors. The workflow engine uses these actors as the core runtime primitives for workflows.
 

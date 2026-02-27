@@ -127,6 +127,8 @@ Dapr uses prometheus process and go collectors by default.
 
 [workflow metrics](../../pkg/diagnostics/workflow_monitoring.go)
 
+These metrics are emitted regardless of which workflow backend is in use (actors or DTS).
+
 * dapr_runtime_workflow_operation_count: The number of successful/failed workflow operation requests.
 * dapr_runtime_workflow_operation_latency: The latencies of responses for workflow operation requests.
 * dapr_runtime_workflow_execution_count: The number of successful/failed/recoverable workflow executions.

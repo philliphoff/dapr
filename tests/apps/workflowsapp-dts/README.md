@@ -65,7 +65,7 @@ All endpoints accept the workflow component name as a route parameter. Use `dts`
 ### Start a PlaceOrder workflow
 
 ```bash
-curl -X POST http://localhost:3000/StartWorkflow/dts/PlaceOrder/order-001
+curl -X POST http://localhost:5000/StartWorkflow/dts/PlaceOrder/order-001
 ```
 
 Returns the workflow instance ID.
@@ -73,7 +73,7 @@ Returns the workflow instance ID.
 ### Get workflow status
 
 ```bash
-curl http://localhost:3000/dts/order-001
+curl http://localhost:5000/dts/order-001
 ```
 
 Returns the runtime status (e.g., `Running`, `Completed`).
@@ -84,15 +84,15 @@ The `PlaceOrder` workflow waits for several external events before completing. S
 
 ```bash
 # 1. Change the purchase item
-curl -X POST http://localhost:3000/RaiseWorkflowEvent/dts/order-001/ChangePurchaseItem/stapler
+curl -X POST http://localhost:5000/RaiseWorkflowEvent/dts/order-001/ChangePurchaseItem/stapler
 
 # 2. Confirm size, color, and address (all three required — WhenAll)
-curl -X POST http://localhost:3000/RaiseWorkflowEvent/dts/order-001/ConfirmSize/large
-curl -X POST http://localhost:3000/RaiseWorkflowEvent/dts/order-001/ConfirmColor/red
-curl -X POST http://localhost:3000/RaiseWorkflowEvent/dts/order-001/ConfirmAddress/123-Main-St
+curl -X POST http://localhost:5000/RaiseWorkflowEvent/dts/order-001/ConfirmColor/red
+curl -X POST http://localhost:5000/RaiseWorkflowEvent/dts/order-001/ConfirmSize/large
+curl -X POST http://localhost:5000/RaiseWorkflowEvent/dts/order-001/ConfirmAddress/123-Main-St
 
 # 3. Choose a payment method (any one — WhenAny)
-curl -X POST http://localhost:3000/RaiseWorkflowEvent/dts/order-001/PayByCard/visa
+curl -X POST http://localhost:5000/RaiseWorkflowEvent/dts/order-001/PayByCard/visa
 ```
 
 After all events are received, the workflow calls the `ShipProduct` activity and completes.
@@ -103,29 +103,29 @@ The `Monitor` workflow periodically checks the status of another workflow instan
 
 ```bash
 # Start a PlaceOrder workflow to monitor
-curl -X POST http://localhost:3000/StartWorkflow/dts/PlaceOrder/order-002
+curl -X POST http://localhost:5000/StartWorkflow/dts/PlaceOrder/order-002
 
 # Start a monitor that watches order-002
-curl -X POST http://localhost:3000/StartMonitorWorkflow/dts/order-002/monitor-001
+curl -X POST http://localhost:5000/StartMonitorWorkflow/dts/order-002/monitor-001
 ```
 
 ### Pause and resume a workflow
 
 ```bash
-curl -X POST http://localhost:3000/PauseWorkflow/dts/order-001
-curl -X POST http://localhost:3000/ResumeWorkflow/dts/order-001
+curl -X POST http://localhost:5000/PauseWorkflow/dts/order-001
+curl -X POST http://localhost:5000/ResumeWorkflow/dts/order-001
 ```
 
 ### Terminate a workflow
 
 ```bash
-curl -X POST http://localhost:3000/TerminateWorkflow/dts/order-001
+curl -X POST http://localhost:5000/TerminateWorkflow/dts/order-001
 ```
 
 ### Purge a workflow
 
 ```bash
-curl -X POST http://localhost:3000/PurgeWorkflow/dts/order-001
+curl -X POST http://localhost:5000/PurgeWorkflow/dts/order-001
 ```
 
 ## Component Configuration

@@ -47,10 +47,26 @@ dapr run \
   --app-port 5000 \
   --dapr-http-port 3500 \
   --dapr-grpc-port 50001 \
-  --resources-path ./resources \
+  --resources-path ./dts-resources \
   --runtime-path ../../../dist/darwin_arm64/release \
   -- dotnet bin/Debug/net8.0/WorkflowActor.dll
 ```
+
+To use Dapr actors for workflows:
+
+```bash
+cd tests/apps/workflowsapp-dts
+
+dapr run \
+  --app-id workflowsapp-actors \
+  --app-port 5000 \
+  --dapr-http-port 3500 \
+  --dapr-grpc-port 50001 \
+  --resources-path ./actor-resources \
+  --runtime-path ../../../dist/darwin_arm64/release \
+  -- dotnet bin/Debug/net8.0/WorkflowActor.dll
+```
+
 
 Replace `darwin_arm64` with your OS/arch (e.g., `linux_amd64`). The `--dapr-grpc-port 50001` flag ensures the Dapr CLI sets `DAPR_GRPC_PORT` explicitly, which the .NET SDK reads to locate the daprd gRPC endpoint.
 

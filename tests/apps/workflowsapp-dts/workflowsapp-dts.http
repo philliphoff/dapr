@@ -3,7 +3,7 @@
 
 @baseUrl = http://localhost:5000
 @workflowComponent = dts
-@instanceId = order-003
+@instanceId = order-004
 
 ### Start a PlaceOrder workflow
 POST {{baseUrl}}/StartWorkflow/{{workflowComponent}}/PlaceOrder/{{instanceId}}

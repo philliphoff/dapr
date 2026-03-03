@@ -1,0 +1,60 @@
+### Workflows App — DTS Backend
+### See README.md for setup instructions.
+
+@baseUrl = http://localhost:5000
+@workflowComponent = dts
+@instanceId = order-003
+
+### Start a PlaceOrder workflow
+POST {{baseUrl}}/StartWorkflow/{{workflowComponent}}/PlaceOrder/{{instanceId}}
+
+### Get workflow status
+GET {{baseUrl}}/{{workflowComponent}}/{{instanceId}}
+
+### -------------------------------------------------------
+### Send events to the PlaceOrder workflow (send in order)
+### -------------------------------------------------------
+
+### 1. Change the purchase item
+POST {{baseUrl}}/RaiseWorkflowEvent/{{workflowComponent}}/{{instanceId}}/ChangePurchaseItem/stapler
+
+### 2. Confirm size, color, and address (all three required — WhenAll)
+POST {{baseUrl}}/RaiseWorkflowEvent/{{workflowComponent}}/{{instanceId}}/ConfirmSize/large
+
+###
+POST {{baseUrl}}/RaiseWorkflowEvent/{{workflowComponent}}/{{instanceId}}/ConfirmColor/red
+
+###
+POST {{baseUrl}}/RaiseWorkflowEvent/{{workflowComponent}}/{{instanceId}}/ConfirmAddress/123-Main-St
+
+### 3. Choose a payment method (any one of these — WhenAny)
+POST {{baseUrl}}/RaiseWorkflowEvent/{{workflowComponent}}/{{instanceId}}/PayByCard/visa
+
+### -------------------------------------------------------
+### Monitor workflow
+### -------------------------------------------------------
+
+### Start a second PlaceOrder workflow to be monitored
+POST {{baseUrl}}/StartWorkflow/{{workflowComponent}}/PlaceOrder/order-002
+
+### Start a monitor that watches order-002
+POST {{baseUrl}}/StartMonitorWorkflow/{{workflowComponent}}/order-002/monitor-001
+
+### Get monitor status
+GET {{baseUrl}}/{{workflowComponent}}/monitor-001
+
+### -------------------------------------------------------
+### Lifecycle operations
+### -------------------------------------------------------
+
+### Pause a workflow
+POST {{baseUrl}}/PauseWorkflow/{{workflowComponent}}/{{instanceId}}
+
+### Resume a workflow
+POST {{baseUrl}}/ResumeWorkflow/{{workflowComponent}}/{{instanceId}}
+
+### Terminate a workflow
+POST {{baseUrl}}/TerminateWorkflow/{{workflowComponent}}/{{instanceId}}
+
+### Purge a workflow
+POST {{baseUrl}}/PurgeWorkflow/{{workflowComponent}}/{{instanceId}}

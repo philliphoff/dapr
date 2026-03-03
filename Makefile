@@ -201,6 +201,31 @@ endef
 $(foreach ITEM,$(BINARIES),$(eval $(call genBinariesForTarget,$(ITEM)$(BINARY_EXT),./cmd/$(ITEM),$(GOOS),$(GOARCH),$(DAPR_OUT_DIR))))
 
 ################################################################################
+# Target: build-dapr-layout                                                    #
+################################################################################
+# Creates the .dapr/ directory structure under DAPR_OUT_DIR so that the
+# Dapr CLI's --runtime-path flag can be pointed directly at DAPR_OUT_DIR:
+#
+#   dapr run --runtime-path $(DAPR_OUT_DIR) ...
+#
+# The layout mirrors what the Dapr CLI installs under ~/.dapr:
+#   <DAPR_OUT_DIR>/.dapr/bin/daprd[.exe]
+#   <DAPR_OUT_DIR>/.dapr/config.yaml   (only created if not already present)
+#
+.PHONY: build-dapr-layout
+DAPR_LAYOUT_DIR     := $(DAPR_OUT_DIR)/.dapr
+DAPR_LAYOUT_BIN_DIR := $(DAPR_LAYOUT_DIR)/bin
+DAPR_LAYOUT_CONFIG  := $(DAPR_LAYOUT_DIR)/config.yaml
+build-dapr-layout: build
+	@mkdir -p $(DAPR_LAYOUT_BIN_DIR)
+	@cp $(DAPR_OUT_DIR)/daprd$(BINARY_EXT) $(DAPR_LAYOUT_BIN_DIR)/daprd$(BINARY_EXT)
+	@if [ ! -f $(DAPR_LAYOUT_CONFIG) ]; then \
+		printf 'apiVersion: dapr.io/v1alpha1\nkind: Configuration\nmetadata:\n  name: daprConfig\nspec:\n  tracing:\n    samplingRate: "1"\n    zipkin:\n      endpointAddress: http://localhost:9411/api/v2/spans\n' \
+			> $(DAPR_LAYOUT_CONFIG); \
+		echo "Created $(DAPR_LAYOUT_CONFIG)"; \
+	fi
+
+################################################################################
 # Target: build-linux                                                          #
 ################################################################################
 BUILD_LINUX_BINS:=$(foreach ITEM,$(BINARIES),$(DAPR_LINUX_OUT_DIR)/$(ITEM))

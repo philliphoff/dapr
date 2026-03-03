@@ -1,5 +1,5 @@
 // ------------------------------------------------------------------------
-// Copyright 2021 The Dapr Authors
+// Copyright 2026 The Dapr Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -23,7 +23,27 @@ namespace DaprDemoActor
     using Microsoft.Extensions.Hosting;
     using System.Threading.Tasks;
     using System;
-    using Dapr.Client;
+
+    /// <summary>
+    /// Activity that uses DaprWorkflowClient (via DI) to check the status of another workflow.
+    /// Class-based activities support constructor injection, unlike lambda-based registrations.
+    /// </summary>
+    public class GetStatusActivity : WorkflowActivity<string, string>
+    {
+        private readonly DaprWorkflowClient _workflowClient;
+
+        public GetStatusActivity(DaprWorkflowClient workflowClient)
+        {
+            _workflowClient = workflowClient;
+        }
+
+        public override async Task<string> RunAsync(WorkflowActivityContext context, string instanceId)
+        {
+            var state = await _workflowClient.GetWorkflowStateAsync(instanceId);
+            return state.RuntimeStatus.ToString();
+        }
+    }
+
 
     /// <summary>
     /// Startup class.
@@ -59,14 +79,14 @@ namespace DaprDemoActor
 
                     itemToPurchase = await context.WaitForExternalEventAsync<string>("ChangePurchaseItem");
                     // Parallel Execution - Waiting for all tasks to finish
-                    Task<string> t1 = context.WaitForExternalEventAsync<string>("ConfirmSize", TimeSpan.FromSeconds(10));  
-                    Task<string> t2 = context.WaitForExternalEventAsync<string>("ConfirmColor", TimeSpan.FromSeconds(10));  
-                    Task<string> t3 = context.WaitForExternalEventAsync<string>("ConfirmAddress", TimeSpan.FromSeconds(10));  
+                    Task<string> t1 = context.WaitForExternalEventAsync<string>("ConfirmSize", TimeSpan.FromMinutes(2));  
+                    Task<string> t2 = context.WaitForExternalEventAsync<string>("ConfirmColor", TimeSpan.FromMinutes(2));  
+                    Task<string> t3 = context.WaitForExternalEventAsync<string>("ConfirmAddress", TimeSpan.FromMinutes(2));  
                     await Task.WhenAll(t1, t2, t3);
                     // Parallel Execution - Waiting for any task to finish
-                    Task<string> e1 = context.WaitForExternalEventAsync<string>("PayInCash", TimeSpan.FromSeconds(10));  
-                    Task<string> e2 = context.WaitForExternalEventAsync<string>("PayByCard", TimeSpan.FromSeconds(10));  
-                    Task<string> e3 = context.WaitForExternalEventAsync<string>("PayOnline", TimeSpan.FromSeconds(10));  
+                    Task<string> e1 = context.WaitForExternalEventAsync<string>("PayInCash", TimeSpan.FromMinutes(2));  
+                    Task<string> e2 = context.WaitForExternalEventAsync<string>("PayByCard", TimeSpan.FromMinutes(2));  
+                    Task<string> e3 = context.WaitForExternalEventAsync<string>("PayOnline", TimeSpan.FromMinutes(2));  
                     await Task.WhenAny(e1, e2, e3);  
    
                     // In real life there are other steps related to placing an order, like reserving
@@ -110,19 +130,10 @@ namespace DaprDemoActor
                     return Task.FromResult($"We are shipping {input} to the customer using our hoard of drones!");
                 });
 
-                // Example of registering a "GetStatus" workflow activity function
-                options.RegisterActivity<string, string>("GetStatus", implementation: async (context, input) =>
-                {
-                    var InstanceId = input;
-
-                    string httpEndpoint = "http://127.0.0.1:" + Environment.GetEnvironmentVariable("DAPR_HTTP_PORT");
-                    string grpcEndpoint = "http://127.0.0.1:" + Environment.GetEnvironmentVariable("DAPR_GRPC_PORT");
-                    DaprClient daprClient = new DaprClientBuilder().UseGrpcEndpoint(grpcEndpoint).UseHttpEndpoint(httpEndpoint).Build();
-
-                    var getResponse = await daprClient.GetWorkflowAsync(InstanceId, "dts");
-
-                    return getResponse.RuntimeStatus.ToString();
-                });
+                // Example of registering a "GetStatus" workflow activity function.
+                // Class-based activity (GetStatusActivity) is used here because it needs
+                // DaprWorkflowClient injected, which lambda activities cannot receive.
+                options.RegisterActivity<GetStatusActivity>("GetStatus");
 
                 // Example of registering a "Alert" workflow activity function
                 options.RegisterActivity<string, string>("Alert", implementation: (context, input) =>
@@ -137,6 +148,25 @@ namespace DaprDemoActor
             services.AddAuthentication().AddDapr();
             services.AddAuthorization(o => o.AddDapr());
             services.AddControllers().AddDapr();
+            // Explicitly configure the gRPC endpoint to handle both old (DAPR_GRPC_PORT) and
+            // new (DAPR_GRPC_ENDPOINT) Dapr CLI env var formats. The SDK 1.17 DaprDefaults reads
+            // only DAPR_GRPC_PORT; newer Dapr CLI versions may only set DAPR_GRPC_ENDPOINT.
+            services.AddDaprClient(builder =>
+            {
+                var grpcEndpoint = Environment.GetEnvironmentVariable("DAPR_GRPC_ENDPOINT");
+                var grpcPort = Environment.GetEnvironmentVariable("DAPR_GRPC_PORT");
+                if (!string.IsNullOrEmpty(grpcEndpoint))
+                {
+
+                    builder.UseGrpcEndpoint(grpcEndpoint);
+                    Console.WriteLine($"Using gRPC endpoint from DAPR_GRPC_ENDPOINT: {grpcEndpoint}");
+                }
+                else if (!string.IsNullOrEmpty(grpcPort))
+                {
+                    builder.UseGrpcEndpoint($"http://127.0.0.1:{grpcPort}");
+                    Console.WriteLine($"Using gRPC endpoint from DAPR_GRPC_PORT: http://127.0.0.1:{grpcPort}");
+                }   
+            });
         }
 
         /// <summary>

@@ -90,14 +90,12 @@ No placement service or state store is required — DTS manages all workflow sta
 
 ## Using the Sample
 
-All endpoints accept a `workflowComponent` route parameter. Use `dapr` for the actors backend or `dts` for the DTS backend. The curl examples below use `dts`; substitute `dapr` if running with actors.
-
 > You can also use the `workflowsapp.http` file directly in VS Code with the REST Client extension.
 
 ### Start a PlaceOrder workflow
 
 ```bash
-curl -X POST http://localhost:5000/StartWorkflow/dts/PlaceOrder/order-001
+curl -X POST http://localhost:5000/StartWorkflow/PlaceOrder/order-001
 ```
 
 Returns the workflow instance ID.
@@ -105,7 +103,7 @@ Returns the workflow instance ID.
 ### Get workflow status
 
 ```bash
-curl http://localhost:5000/dts/order-001
+curl http://localhost:5000/order-001
 ```
 
 Returns the runtime status (e.g., `Running`, `Completed`).
@@ -116,15 +114,15 @@ The `PlaceOrder` workflow waits for several external events before completing. S
 
 ```bash
 # 1. Change the purchase item
-curl -X POST http://localhost:5000/RaiseWorkflowEvent/dts/order-001/ChangePurchaseItem/stapler
+curl -X POST http://localhost:5000/RaiseWorkflowEvent/order-001/ChangePurchaseItem/stapler
 
 # 2. Confirm size, color, and address (all three required — WhenAll)
-curl -X POST http://localhost:5000/RaiseWorkflowEvent/dts/order-001/ConfirmSize/large
-curl -X POST http://localhost:5000/RaiseWorkflowEvent/dts/order-001/ConfirmColor/red
-curl -X POST http://localhost:5000/RaiseWorkflowEvent/dts/order-001/ConfirmAddress/123-Main-St
+curl -X POST http://localhost:5000/RaiseWorkflowEvent/order-001/ConfirmSize/large
+curl -X POST http://localhost:5000/RaiseWorkflowEvent/order-001/ConfirmColor/red
+curl -X POST http://localhost:5000/RaiseWorkflowEvent/order-001/ConfirmAddress/123-Main-St
 
 # 3. Choose a payment method (any one — WhenAny)
-curl -X POST http://localhost:5000/RaiseWorkflowEvent/dts/order-001/PayByCard/visa
+curl -X POST http://localhost:5000/RaiseWorkflowEvent/order-001/PayByCard/visa
 ```
 
 After all events are received, the workflow calls the `ShipProduct` activity and completes.
@@ -135,29 +133,29 @@ The `Monitor` workflow periodically checks the status of another workflow instan
 
 ```bash
 # Start a PlaceOrder workflow to monitor
-curl -X POST http://localhost:5000/StartWorkflow/dts/PlaceOrder/order-002
+curl -X POST http://localhost:5000/StartWorkflow/PlaceOrder/order-002
 
 # Start a monitor that watches order-002
-curl -X POST http://localhost:5000/StartMonitorWorkflow/dts/order-002/monitor-001
+curl -X POST http://localhost:5000/StartMonitorWorkflow/order-002/monitor-001
 ```
 
 ### Pause and resume a workflow
 
 ```bash
-curl -X POST http://localhost:5000/PauseWorkflow/dts/order-001
-curl -X POST http://localhost:5000/ResumeWorkflow/dts/order-001
+curl -X POST http://localhost:5000/PauseWorkflow/order-001
+curl -X POST http://localhost:5000/ResumeWorkflow/order-001
 ```
 
 ### Terminate a workflow
 
 ```bash
-curl -X POST http://localhost:5000/TerminateWorkflow/dts/order-001
+curl -X POST http://localhost:5000/TerminateWorkflow/order-001
 ```
 
 ### Purge a workflow
 
 ```bash
-curl -X POST http://localhost:5000/PurgeWorkflow/dts/order-001
+curl -X POST http://localhost:5000/PurgeWorkflow/order-001
 ```
 
 ## Component Configuration

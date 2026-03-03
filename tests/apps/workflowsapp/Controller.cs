@@ -31,16 +31,16 @@ namespace DaprDemoActor
       _daprClient = daprClient;
     }
 
-    [HttpGet("{workflowComponent}/{instanceID}")]
-    public async Task<ActionResult<string>> GetWorkflow([FromRoute] string instanceID, string workflowComponent)
+    [HttpGet("{instanceID}")]
+    public async Task<ActionResult<string>> GetWorkflow([FromRoute] string instanceID)
     {
       await _daprClient.WaitForSidecarAsync();
       var state = await _workflowClient.GetWorkflowStateAsync(instanceID);
       return state.RuntimeStatus.ToString();
     }
 
-    [HttpPost("StartWorkflow/{workflowComponent}/{workflowName}/{instanceID}")]
-    public async Task<ActionResult<string>> StartWorkflow([FromRoute] string instanceID, string workflowName, string workflowComponent)
+    [HttpPost("StartWorkflow/{workflowName}/{instanceID}")]
+    public async Task<ActionResult<string>> StartWorkflow([FromRoute] string instanceID, string workflowName)
     {
       await _daprClient.WaitForSidecarAsync();
       var startedInstanceId = await _workflowClient.ScheduleNewWorkflowAsync(
@@ -51,8 +51,8 @@ namespace DaprDemoActor
       return startedInstanceId;
     }
 
-    [HttpPost("StartMonitorWorkflow/{workflowComponent}/{watchInstanceID}/{instanceID}")]
-    public async Task<ActionResult<string>> StartMonitorWorkflow([FromRoute] string watchInstanceID, string instanceID, string workflowComponent)
+    [HttpPost("StartMonitorWorkflow/{watchInstanceID}/{instanceID}")]
+    public async Task<ActionResult<string>> StartMonitorWorkflow([FromRoute] string watchInstanceID, string instanceID)
     {
       await _daprClient.WaitForSidecarAsync();
       var startedInstanceId = await _workflowClient.ScheduleNewWorkflowAsync(
@@ -63,36 +63,36 @@ namespace DaprDemoActor
       return startedInstanceId;
     }
 
-    [HttpPost("PurgeWorkflow/{workflowComponent}/{instanceID}")]
-    public async Task<ActionResult<bool>> PurgeWorkflow([FromRoute] string instanceID, string workflowComponent)
+    [HttpPost("PurgeWorkflow/{instanceID}")]
+    public async Task<ActionResult<bool>> PurgeWorkflow([FromRoute] string instanceID)
     {
       await _workflowClient.PurgeInstanceAsync(instanceID);
       return true;
     }
 
-    [HttpPost("TerminateWorkflow/{workflowComponent}/{instanceID}")]
-    public async Task<ActionResult<bool>> TerminateWorkflow([FromRoute] string instanceID, string workflowComponent)
+    [HttpPost("TerminateWorkflow/{instanceID}")]
+    public async Task<ActionResult<bool>> TerminateWorkflow([FromRoute] string instanceID)
     {
       await _workflowClient.TerminateWorkflowAsync(instanceID);
       return true;
     }
 
-    [HttpPost("PauseWorkflow/{workflowComponent}/{instanceID}")]
-    public async Task<ActionResult<bool>> PauseWorkflow([FromRoute] string instanceID, string workflowComponent)
+    [HttpPost("PauseWorkflow/{instanceID}")]
+    public async Task<ActionResult<bool>> PauseWorkflow([FromRoute] string instanceID)
     {
       await _workflowClient.SuspendWorkflowAsync(instanceID);
       return true;
     }
 
-    [HttpPost("ResumeWorkflow/{workflowComponent}/{instanceID}")]
-    public async Task<ActionResult<bool>> ResumeWorkflow([FromRoute] string instanceID, string workflowComponent)
+    [HttpPost("ResumeWorkflow/{instanceID}")]
+    public async Task<ActionResult<bool>> ResumeWorkflow([FromRoute] string instanceID)
     {
       await _workflowClient.ResumeWorkflowAsync(instanceID);
       return true;
     }
 
-    [HttpPost("RaiseWorkflowEvent/{workflowComponent}/{instanceID}/{eventName}/{eventInput}")]
-    public async Task<ActionResult<bool>> RaiseWorkflowEvent([FromRoute] string instanceID, string workflowComponent, string eventName, string eventInput)
+    [HttpPost("RaiseWorkflowEvent/{instanceID}/{eventName}/{eventInput}")]
+    public async Task<ActionResult<bool>> RaiseWorkflowEvent([FromRoute] string instanceID, string eventName, string eventInput)
     {
       await _workflowClient.RaiseEventAsync(instanceID, eventName, eventInput);
       return true;

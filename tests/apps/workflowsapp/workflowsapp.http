@@ -1,61 +1,60 @@
 ### Workflows App
 ### See README.md for setup instructions.
-### Set @workflowComponent to "dts" (DTS backend) or "dapr" (actors backend).
+### The workflow backend (actors or DTS) is determined by the --resources-path used with dapr run.
 
 @baseUrl = http://localhost:5000
-@workflowComponent = dts
-@instanceId = order-004
+@instanceId = order-001
 
 ### Start a PlaceOrder workflow
-POST {{baseUrl}}/StartWorkflow/{{workflowComponent}}/PlaceOrder/{{instanceId}}
+POST {{baseUrl}}/StartWorkflow/PlaceOrder/{{instanceId}}
 
 ### Get workflow status
-GET {{baseUrl}}/{{workflowComponent}}/{{instanceId}}
+GET {{baseUrl}}/{{instanceId}}
 
 ### -------------------------------------------------------
 ### Send events to the PlaceOrder workflow (send in order)
 ### -------------------------------------------------------
 
 ### 1. Change the purchase item
-POST {{baseUrl}}/RaiseWorkflowEvent/{{workflowComponent}}/{{instanceId}}/ChangePurchaseItem/stapler
+POST {{baseUrl}}/RaiseWorkflowEvent/{{instanceId}}/ChangePurchaseItem/stapler
 
 ### 2. Confirm size, color, and address (all three required — WhenAll)
-POST {{baseUrl}}/RaiseWorkflowEvent/{{workflowComponent}}/{{instanceId}}/ConfirmSize/large
+POST {{baseUrl}}/RaiseWorkflowEvent/{{instanceId}}/ConfirmSize/large
 
 ###
-POST {{baseUrl}}/RaiseWorkflowEvent/{{workflowComponent}}/{{instanceId}}/ConfirmColor/red
+POST {{baseUrl}}/RaiseWorkflowEvent/{{instanceId}}/ConfirmColor/red
 
 ###
-POST {{baseUrl}}/RaiseWorkflowEvent/{{workflowComponent}}/{{instanceId}}/ConfirmAddress/123-Main-St
+POST {{baseUrl}}/RaiseWorkflowEvent/{{instanceId}}/ConfirmAddress/123-Main-St
 
 ### 3. Choose a payment method (any one of these — WhenAny)
-POST {{baseUrl}}/RaiseWorkflowEvent/{{workflowComponent}}/{{instanceId}}/PayByCard/visa
+POST {{baseUrl}}/RaiseWorkflowEvent/{{instanceId}}/PayByCard/visa
 
 ### -------------------------------------------------------
 ### Monitor workflow
 ### -------------------------------------------------------
 
 ### Start a second PlaceOrder workflow to be monitored
-POST {{baseUrl}}/StartWorkflow/{{workflowComponent}}/PlaceOrder/order-002
+POST {{baseUrl}}/StartWorkflow/PlaceOrder/order-002
 
 ### Start a monitor that watches order-002
-POST {{baseUrl}}/StartMonitorWorkflow/{{workflowComponent}}/order-002/monitor-001
+POST {{baseUrl}}/StartMonitorWorkflow/order-002/monitor-001
 
 ### Get monitor status
-GET {{baseUrl}}/{{workflowComponent}}/monitor-001
+GET {{baseUrl}}/monitor-001
 
 ### -------------------------------------------------------
 ### Lifecycle operations
 ### -------------------------------------------------------
 
 ### Pause a workflow
-POST {{baseUrl}}/PauseWorkflow/{{workflowComponent}}/{{instanceId}}
+POST {{baseUrl}}/PauseWorkflow/{{instanceId}}
 
 ### Resume a workflow
-POST {{baseUrl}}/ResumeWorkflow/{{workflowComponent}}/{{instanceId}}
+POST {{baseUrl}}/ResumeWorkflow/{{instanceId}}
 
 ### Terminate a workflow
-POST {{baseUrl}}/TerminateWorkflow/{{workflowComponent}}/{{instanceId}}
+POST {{baseUrl}}/TerminateWorkflow/{{instanceId}}
 
 ### Purge a workflow
-POST {{baseUrl}}/PurgeWorkflow/{{workflowComponent}}/{{instanceId}}
+POST {{baseUrl}}/PurgeWorkflow/{{instanceId}}

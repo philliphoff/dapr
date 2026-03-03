@@ -41,7 +41,7 @@ docker run -d --name dts-emulator \
 
 The emulator dashboard is available at `http://localhost:8082`.
 
-The Dapr workflow API (HTTP/gRPC) works identically regardless of which backend is configured. See [tests/apps/workflowdts](../../../tests/apps/workflowdts/) and [tests/apps/workflowsapp-dts](../../../tests/apps/workflowsapp-dts/) for sample applications using the DTS backend.
+The Dapr workflow API (HTTP/gRPC) works identically regardless of which backend is configured. See [tests/apps/workflowdts](../../../tests/apps/workflowdts/) and [tests/apps/workflowsapp](../../../tests/apps/workflowsapp/) for sample applications that demonstrate both backends.
 
 ## Building Daprd
 

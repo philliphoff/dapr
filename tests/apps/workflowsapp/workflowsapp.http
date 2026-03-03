@@ -1,5 +1,6 @@
-### Workflows App — DTS Backend
+### Workflows App
 ### See README.md for setup instructions.
+### Set @workflowComponent to "dts" (DTS backend) or "dapr" (actors backend).
 
 @baseUrl = http://localhost:5000
 @workflowComponent = dts
